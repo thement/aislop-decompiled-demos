@@ -58,7 +58,7 @@ static void init_texture(void)
      */
     memset(texture, 0, sizeof(texture));
 
-    uint8_t al = 0, dh = 0;
+    uint8_t al = 0, dh = 0x03;  /* DH=0x03 from palette loop (DX=0x3C9) */
     uint8_t cf = 0;
 
     for (int iter = 0; iter < 65536; iter++) {
@@ -177,15 +177,18 @@ int main(int argc, char *argv[])
                 for (int step = 0; step < 32; step++) {
                     float sdf = cosf(posZ) + cosf(posY) + cosf(posX)
                               + 0.69314718f;  /* ln(2) */
+                    int is_hit = (sdf < EPSILON);
 
-                    if (sdf < EPSILON) {
-                        steps_left = 32 - step;
-                        break;
-                    }
-
+                    /* Original advances ray BEFORE jc check (FPU ops
+                     * don't affect EFLAGS), so hit uses advanced pos. */
                     posX += sdf * ry;
                     posY += sdf * rx;
                     posZ += sdf * rz;
+
+                    if (is_hit) {
+                        steps_left = 32 - step;
+                        break;
+                    }
                 }
 
                 /*
