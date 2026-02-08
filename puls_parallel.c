@@ -206,7 +206,7 @@ typedef struct {
     uint8_t  *pixbuf;
     float     sin_T, cos_T;
     int16_t   r_val;
-    int16_t   T_signed;
+    float     T_f;
     int       quit;
 } frame_params_t;
 
@@ -225,12 +225,12 @@ static void render_rows(const frame_params_t *fp, int row_begin, int row_end)
     float sin_T = fp->sin_T;
     float cos_T = fp->cos_T;
     int16_t r_val = fp->r_val;
-    int16_t T_signed = fp->T_signed;
+    float T_f = fp->T_f;
     int maxstepshift = fp->maxstepshift;
     int maxiters = fp->maxiters;
     uint8_t *pixbuf = fp->pixbuf;
 
-    int16_t base = (int16_t)((int)T_signed * 10);
+    int16_t base = (int16_t)lrintf(T_f * 10.0f);
 
     for (int row = row_begin; row < row_end; row++) {
         float py_f = (row + 0.5f) / H * 200.0f - 100.0f;
@@ -337,8 +337,15 @@ int main(int argc, char *argv[])
     /* Don't use more threads than rows */
     if (nthreads > H) nthreads = H;
 
-    fprintf(stderr, "puls_parallel: %dx%d, precision=%d (maxstepshift=%d, maxiters=%d), %d threads\n",
-            W, H, precision, maxstepshift, maxiters, nthreads);
+    float speed = 22.0f;  /* original is 88; default 4x slower for smooth motion */
+    const char *env_speed = getenv("SPEED");
+    if (env_speed) {
+        speed = strtof(env_speed, NULL);
+        if (speed < 0.0f) speed = 0.0f;
+    }
+
+    fprintf(stderr, "puls_parallel: %dx%d, precision=%d (maxstepshift=%d, maxiters=%d), %d threads, speed=%.1f\n",
+            W, H, precision, maxstepshift, maxiters, nthreads, speed);
 
     if (SDL_Init(SDL_INIT_VIDEO) < 0) {
         fprintf(stderr, "SDL_Init: %s\n", SDL_GetError());
@@ -389,7 +396,7 @@ int main(int argc, char *argv[])
         pthread_create(&threads[i], NULL, worker_func, &workers[i]);
     }
 
-    uint16_t T = 0;
+    float T_f = 0.0f;
     int running = 1;
 
     while (running) {
@@ -403,15 +410,14 @@ int main(int argc, char *argv[])
                 running = 0;
         }
 
-        T += 88;
-        int16_t T_signed = (int16_t)T;
+        T_f += speed;
 
         /* Set frame params (workers are idle, waiting on bar_start) */
-        fp.sin_T    = sinf((float)T_signed);
-        fp.cos_T    = cosf((float)T_signed);
-        fp.T_signed = T_signed;
+        fp.sin_T = sinf(T_f);
+        fp.cos_T = cosf(T_f);
+        fp.T_f   = T_f;
 
-        float r_f = (float)WORD_100H * sinf((float)T_signed * FLOAT_100H);
+        float r_f = (float)WORD_100H * sinf(T_f * FLOAT_100H);
         fp.r_val = (int16_t)lrintf(r_f);
 
         /* Release workers */
