@@ -240,9 +240,7 @@ static void render_rows(const frame_params_t *fp, int row_begin, int row_end)
             int16_t x_int = (int16_t)lrintf(px_f * 204.0f);
             int16_t y_int = (int16_t)lrintf(py_f * 256.0f);
 
-            int16_t z_int = (int16_t)(0x5600
-                - (int16_t)((int32_t)x_int * x_int >> 16)
-                - (int16_t)((int32_t)y_int * y_int >> 16));
+            int16_t z_int = 0x5600;
 
             float d[3] = {(float)z_int, (float)x_int, (float)y_int};
             for (int pass = 0; pass < 3; pass++) {
