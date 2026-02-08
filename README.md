@@ -2,7 +2,7 @@
 
 Decompiled DOS demoscene intros ported to C with SDL 1.2.
 
-Three effects from the 256-byte intro scene, reverse-engineered from x86 real-mode COM binaries into readable C with faithful pixel-accurate rendering.
+Three effects from the 256-byte intro scene, reverse-engineered from x86 real-mode COM binaries into readable C. Demos decompiled using LLMs.
 
 ## Effects
 
