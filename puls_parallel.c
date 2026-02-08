@@ -397,6 +397,10 @@ int main(int argc, char *argv[])
     }
 
     float T_f = 0.0f;
+    float rot_angle = 0.0f;
+    /* Original step 88 ≈ 14×2π, so effective rotation ≈ 0.0354 rad/frame.
+     * Scale proportionally with speed to keep rotation smooth. */
+    float rot_step = fmodf(88.0f, 2.0f * (float)M_PI) * (speed / 88.0f);
     int running = 1;
 
     while (running) {
@@ -411,10 +415,11 @@ int main(int argc, char *argv[])
         }
 
         T_f += speed;
+        rot_angle += rot_step;
 
         /* Set frame params (workers are idle, waiting on bar_start) */
-        fp.sin_T = sinf(T_f);
-        fp.cos_T = cosf(T_f);
+        fp.sin_T = sinf(rot_angle);
+        fp.cos_T = cosf(rot_angle);
         fp.T_f   = T_f;
 
         float r_f = (float)WORD_100H * sinf(T_f * FLOAT_100H);
