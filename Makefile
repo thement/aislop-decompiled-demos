@@ -3,7 +3,7 @@ CFLAGS  = -O2 -Wall -Wextra
 LDFLAGS = $(shell sdl-config --libs) -lm
 SDLCFLAGS = $(shell sdl-config --cflags)
 
-all: tube_sdl lattice_sdl puls_sdl tube_big lattice_big puls_big
+all: tube_sdl lattice_sdl puls_sdl tube_big lattice_big puls_big puls_parallel
 
 tube_sdl: tube_sdl.c
 	$(CC) $(CFLAGS) $(SDLCFLAGS) -o $@ $< $(LDFLAGS)
@@ -23,7 +23,10 @@ lattice_big: lattice_big.c
 puls_big: puls_big.c
 	$(CC) $(CFLAGS) $(SDLCFLAGS) -o $@ $< $(LDFLAGS)
 
+puls_parallel: puls_parallel.c
+	$(CC) $(CFLAGS) $(SDLCFLAGS) -o $@ $< $(LDFLAGS) -lpthread
+
 clean:
-	rm -f tube_sdl lattice_sdl puls_sdl tube_big lattice_big puls_big
+	rm -f tube_sdl lattice_sdl puls_sdl tube_big lattice_big puls_big puls_parallel
 
 .PHONY: all clean
