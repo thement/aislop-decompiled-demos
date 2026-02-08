@@ -10,6 +10,7 @@
 
 #include <SDL/SDL.h>
 #include <math.h>
+#include <stdio.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
@@ -106,7 +107,10 @@ int main(int argc, char *argv[])
     init_palette(screen);
     init_texture();
 
-    int16_t zmove_val = ZMOVE_INIT;
+    float zmove_f = (float)ZMOVE_INIT;
+    float speed_mult = 1.0f;
+    int   screenshot_counter = 0;
+    int   take_screenshot = 0;
     uint8_t *pixbuf = (uint8_t *)malloc((size_t)W * H);
     if (!pixbuf) {
         fprintf(stderr, "Out of memory\n");
@@ -122,14 +126,30 @@ int main(int argc, char *argv[])
         while (SDL_PollEvent(&ev)) {
             if (ev.type == SDL_QUIT)
                 running = 0;
-            if (ev.type == SDL_KEYDOWN && ev.key.keysym.sym == SDLK_ESCAPE)
-                running = 0;
+            if (ev.type == SDL_KEYDOWN) {
+                switch (ev.key.keysym.sym) {
+                case SDLK_ESCAPE: running = 0; break;
+                case SDLK_PLUS: case SDLK_EQUALS:
+                    speed_mult *= 1.25f;
+                    if (speed_mult > 16.0f) speed_mult = 16.0f;
+                    break;
+                case SDLK_MINUS:
+                    speed_mult *= 0.8f;
+                    if (speed_mult < 0.0f) speed_mult = 0.0f;
+                    break;
+                case SDLK_s:
+                    take_screenshot = 1;
+                    break;
+                default: break;
+                }
+            }
         }
 
-        float angle = (float)zmove_val / 41.0f;
+        zmove_f -= speed_mult;
+        float angle = zmove_f / 41.0f;
         float cosa  = cosf(angle);
         float sina  = sinf(angle);
-        float cam_z = (float)zmove_val / (float)M_PI;
+        float cam_z = zmove_f / (float)M_PI;
 
         int pi = 0;
         for (int row = 0; row < H; row++) {
@@ -200,9 +220,17 @@ int main(int argc, char *argv[])
 
         if (SDL_MUSTLOCK(screen))
             SDL_UnlockSurface(screen);
-        SDL_Flip(screen);
 
-        zmove_val--;
+        if (take_screenshot) {
+            char fname[64];
+            screenshot_counter++;
+            snprintf(fname, sizeof(fname), "screenshot_%04d.bmp", screenshot_counter);
+            SDL_SaveBMP(screen, fname);
+            fprintf(stderr, "Saved %s\n", fname);
+            take_screenshot = 0;
+        }
+
+        SDL_Flip(screen);
 
         uint32_t elapsed = SDL_GetTicks() - frame_start;
         if (elapsed < FRAME_MS)

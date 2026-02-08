@@ -9,11 +9,13 @@
  *   precision     - raymarching precision 0-8 (default: auto from resolution)
  *
  * Set THREADS env var to control thread count (default 16).
+ * Controls: +/- speed, S screenshot, ESC quit.
  */
 
 #include <SDL/SDL.h>
 #include <math.h>
 #include <pthread.h>
+#include <stdio.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
@@ -304,7 +306,7 @@ int main(int argc, char *argv[])
             fprintf(stderr,
                 "Usage: %s [width height [precision]]\n"
                 "  precision 0-8 (default: auto from resolution)\n"
-                "  Set THREADS env var for thread count (default 16)\n", argv[0]);
+                "  THREADS env var: thread count (default 16)\n", argv[0]);
             return 1;
         }
     }
@@ -337,15 +339,11 @@ int main(int argc, char *argv[])
     /* Don't use more threads than rows */
     if (nthreads > H) nthreads = H;
 
-    float speed = 22.0f;  /* original is 88; default 4x slower for smooth motion */
-    const char *env_speed = getenv("SPEED");
-    if (env_speed) {
-        speed = strtof(env_speed, NULL);
-        if (speed < 0.0f) speed = 0.0f;
-    }
+    float base_speed = 22.0f;  /* original is 88; default 4x slower for smooth motion */
+    float speed_mult = 1.0f;
 
-    fprintf(stderr, "puls_parallel: %dx%d, precision=%d (maxstepshift=%d, maxiters=%d), %d threads, speed=%.1f\n",
-            W, H, precision, maxstepshift, maxiters, nthreads, speed);
+    fprintf(stderr, "puls_parallel: %dx%d, precision=%d (maxstepshift=%d, maxiters=%d), %d threads\n",
+            W, H, precision, maxstepshift, maxiters, nthreads);
 
     if (SDL_Init(SDL_INIT_VIDEO) < 0) {
         fprintf(stderr, "SDL_Init: %s\n", SDL_GetError());
@@ -398,9 +396,9 @@ int main(int argc, char *argv[])
 
     float T_f = 0.0f;
     float rot_angle = 0.0f;
-    /* Original step 88 ≈ 14×2π, so effective rotation ≈ 0.0354 rad/frame.
-     * Scale proportionally with speed to keep rotation smooth. */
-    float rot_step = fmodf(88.0f, 2.0f * (float)M_PI) * (speed / 88.0f);
+    float rot_step = fmodf(88.0f, 2.0f * (float)M_PI) * (base_speed / 88.0f);
+    int   screenshot_counter = 0;
+    int   take_screenshot = 0;
     int running = 1;
 
     while (running) {
@@ -410,10 +408,28 @@ int main(int argc, char *argv[])
         while (SDL_PollEvent(&ev)) {
             if (ev.type == SDL_QUIT)
                 running = 0;
-            if (ev.type == SDL_KEYDOWN && ev.key.keysym.sym == SDLK_ESCAPE)
-                running = 0;
+            if (ev.type == SDL_KEYDOWN) {
+                switch (ev.key.keysym.sym) {
+                case SDLK_ESCAPE: running = 0; break;
+                case SDLK_PLUS: case SDLK_EQUALS:
+                    speed_mult *= 1.25f;
+                    if (speed_mult > 16.0f) speed_mult = 16.0f;
+                    rot_step = fmodf(88.0f, 2.0f * (float)M_PI) * (base_speed * speed_mult / 88.0f);
+                    break;
+                case SDLK_MINUS:
+                    speed_mult *= 0.8f;
+                    if (speed_mult < 0.0f) speed_mult = 0.0f;
+                    rot_step = fmodf(88.0f, 2.0f * (float)M_PI) * (base_speed * speed_mult / 88.0f);
+                    break;
+                case SDLK_s:
+                    take_screenshot = 1;
+                    break;
+                default: break;
+                }
+            }
         }
 
+        float speed = base_speed * speed_mult;
         T_f += speed;
         rot_angle += rot_step;
 
@@ -447,6 +463,16 @@ int main(int argc, char *argv[])
 
         if (SDL_MUSTLOCK(screen))
             SDL_UnlockSurface(screen);
+
+        if (take_screenshot) {
+            char fname[64];
+            screenshot_counter++;
+            snprintf(fname, sizeof(fname), "screenshot_%04d.bmp", screenshot_counter);
+            SDL_SaveBMP(screen, fname);
+            fprintf(stderr, "Saved %s\n", fname);
+            take_screenshot = 0;
+        }
+
         SDL_Flip(screen);
 
         uint32_t elapsed = SDL_GetTicks() - frame_start;

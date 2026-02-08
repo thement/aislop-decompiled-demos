@@ -13,6 +13,7 @@
 
 #include <SDL/SDL.h>
 #include <math.h>
+#include <stdio.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
@@ -267,7 +268,13 @@ int main(int argc, char *argv[])
 
     init_palette(screen);
 
-    uint16_t T = 0;
+    float T_f = 0.0f;
+    float rot_angle = 0.0f;
+    float base_speed = 88.0f;
+    float speed_mult = 1.0f;
+    float rot_step = fmodf(88.0f, 2.0f * (float)M_PI) * (base_speed / 88.0f);
+    int   screenshot_counter = 0;
+    int   take_screenshot = 0;
     uint8_t *pixbuf = (uint8_t *)malloc((size_t)W * H);
     if (!pixbuf) {
         fprintf(stderr, "Out of memory\n");
@@ -283,17 +290,35 @@ int main(int argc, char *argv[])
         while (SDL_PollEvent(&ev)) {
             if (ev.type == SDL_QUIT)
                 running = 0;
-            if (ev.type == SDL_KEYDOWN && ev.key.keysym.sym == SDLK_ESCAPE)
-                running = 0;
+            if (ev.type == SDL_KEYDOWN) {
+                switch (ev.key.keysym.sym) {
+                case SDLK_ESCAPE: running = 0; break;
+                case SDLK_PLUS: case SDLK_EQUALS:
+                    speed_mult *= 1.25f;
+                    if (speed_mult > 16.0f) speed_mult = 16.0f;
+                    rot_step = fmodf(88.0f, 2.0f * (float)M_PI) * (base_speed * speed_mult / 88.0f);
+                    break;
+                case SDLK_MINUS:
+                    speed_mult *= 0.8f;
+                    if (speed_mult < 0.0f) speed_mult = 0.0f;
+                    rot_step = fmodf(88.0f, 2.0f * (float)M_PI) * (base_speed * speed_mult / 88.0f);
+                    break;
+                case SDLK_s:
+                    take_screenshot = 1;
+                    break;
+                default: break;
+                }
+            }
         }
 
-        T += 88;
-        int16_t T_signed = (int16_t)T;
+        float speed = base_speed * speed_mult;
+        T_f += speed;
+        rot_angle += rot_step;
 
-        float sin_T = sinf((float)T_signed);
-        float cos_T = cosf((float)T_signed);
+        float sin_T = sinf(rot_angle);
+        float cos_T = cosf(rot_angle);
 
-        float r_f = (float)WORD_100H * sinf((float)T_signed * FLOAT_100H);
+        float r_f = (float)WORD_100H * sinf(T_f * FLOAT_100H);
         int16_t r_val = (int16_t)lrintf(r_f);
 
         for (int row = 0; row < H; row++) {
@@ -332,7 +357,7 @@ int main(int argc, char *argv[])
                     dir[i] = (int16_t)v;
                 }
 
-                int16_t base = (int16_t)((int)T_signed * 10);
+                int16_t base = (int16_t)lrintf(T_f * 10.0f);
                 int16_t orig[3];
                 orig[0] = base;
                 orig[1] = (int16_t)((uint16_t)base + 0xB000u);
@@ -359,6 +384,16 @@ int main(int argc, char *argv[])
 
         if (SDL_MUSTLOCK(screen))
             SDL_UnlockSurface(screen);
+
+        if (take_screenshot) {
+            char fname[64];
+            screenshot_counter++;
+            snprintf(fname, sizeof(fname), "screenshot_%04d.bmp", screenshot_counter);
+            SDL_SaveBMP(screen, fname);
+            fprintf(stderr, "Saved %s\n", fname);
+            take_screenshot = 0;
+        }
+
         SDL_Flip(screen);
 
         uint32_t elapsed = SDL_GetTicks() - frame_start;

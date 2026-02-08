@@ -10,6 +10,7 @@
 
 #include <SDL/SDL.h>
 #include <math.h>
+#include <stdio.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
@@ -124,6 +125,10 @@ int main(int argc, char *argv[])
 
     float   angle     = 0.0f;
     uint8_t bh_scroll = 0;
+    float   scroll_acc = 0.0f;
+    float   speed_mult = 1.0f;
+    int     screenshot_counter = 0;
+    int     take_screenshot = 0;
     int     running   = 1;
 
     while (running) {
@@ -133,12 +138,29 @@ int main(int argc, char *argv[])
         while (SDL_PollEvent(&ev)) {
             if (ev.type == SDL_QUIT)
                 running = 0;
-            if (ev.type == SDL_KEYDOWN && ev.key.keysym.sym == SDLK_ESCAPE)
-                running = 0;
+            if (ev.type == SDL_KEYDOWN) {
+                switch (ev.key.keysym.sym) {
+                case SDLK_ESCAPE: running = 0; break;
+                case SDLK_PLUS: case SDLK_EQUALS:
+                    speed_mult *= 1.25f;
+                    if (speed_mult > 16.0f) speed_mult = 16.0f;
+                    break;
+                case SDLK_MINUS:
+                    speed_mult *= 0.8f;
+                    if (speed_mult < 0.0f) speed_mult = 0.0f;
+                    break;
+                case SDLK_s:
+                    take_screenshot = 1;
+                    break;
+                default: break;
+                }
+            }
         }
 
-        angle     += ANGLE_INC;
-        bh_scroll += 8;
+        angle += ANGLE_INC * speed_mult;
+        scroll_acc += 8.0f * speed_mult;
+        bh_scroll += (uint8_t)scroll_acc;
+        scroll_acc -= (int)scroll_acc;
         uint16_t bx = ((uint16_t)bh_scroll << 8) | 1;
 
         float cosa = cosf(angle);
@@ -225,6 +247,16 @@ int main(int argc, char *argv[])
 
         if (SDL_MUSTLOCK(screen))
             SDL_UnlockSurface(screen);
+
+        if (take_screenshot) {
+            char fname[64];
+            screenshot_counter++;
+            snprintf(fname, sizeof(fname), "screenshot_%04d.bmp", screenshot_counter);
+            SDL_SaveBMP(screen, fname);
+            fprintf(stderr, "Saved %s\n", fname);
+            take_screenshot = 0;
+        }
+
         SDL_Flip(screen);
 
         /* Motion blur: arithmetic shift right by 2 (fade to black) */
