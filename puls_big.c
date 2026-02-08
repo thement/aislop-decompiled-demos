@@ -88,20 +88,20 @@ static void init_palette(SDL_Surface *screen)
 static uint8_t intersect(int16_t dir[3], int16_t orig[3], int16_t r_val,
                           int maxstepshift, int maxiters)
 {
-    int stepshift = maxstepshift;
+    /*
+     * Always start at BASE_MAXSTEPSHIFT (6), not maxstepshift.
+     * The original algorithm ramps stepshift DOWN from 6→0 (coarse
+     * exploration) then back UP from 0→6 (convergence).  Starting
+     * at a higher maxstepshift would waste D extra miss-iterations
+     * ramping down from 6+D to 6 before any useful exploration,
+     * starving the coarse phase and producing wrong colors.
+     * The extra precision levels (6..maxstepshift) are reached
+     * naturally during the convergence ramp-up.
+     */
+    int stepshift = BASE_MAXSTEPSHIFT;
     int16_t hit_flag = 0;
     int8_t  ah = -(int8_t)maxiters;
     uint8_t al = 0;
-
-    /*
-     * Snapshot ah when stepshift first reaches the original convergence
-     * depth (BASE_MAXSTEPSHIFT=6).  In the original code, the loop breaks
-     * at that point *before* the ah += hit_flag line, so the snapshot is
-     * taken at the same position.  Continued iterations only refine the
-     * surface edge (better hue), not the brightness.
-     */
-    int8_t ah_snapshot = ah;
-    int    base_reached = 0;
 
     for (;;) {
         for (int i = 0; i < 3; i++) {
@@ -199,30 +199,14 @@ static uint8_t intersect(int16_t dir[3], int16_t orig[3], int16_t r_val,
             if (stepshift > 0) stepshift--;
         }
 
-        /* Snapshot ah the first time we reach original convergence depth.
-         * This is exactly where the original loop would break, and crucially
-         * it's before the ah += hit_flag adjustment below. */
-        if (!base_reached && stepshift >= BASE_MAXSTEPSHIFT) {
-            ah_snapshot = ah;
-            base_reached = 1;
-        }
-
         if (stepshift >= maxstepshift) break;
 
         ah += (int8_t)(hit_flag & 0xFF);
         if (ah == 0) break;
     }
 
-    /* Use snapshot brightness for converged rays (same as original would
-     * compute), but keep final al for hue (more accurate from extra
-     * convergence).  Non-converged rays use their actual ah/stepshift. */
-    int8_t ah_color;
-    if (base_reached) {
-        ah_color = ah_snapshot - (int8_t)BASE_MAXSTEPSHIFT;
-    } else {
-        ah_color = ah - (int8_t)stepshift;
-    }
-    uint8_t color = (uint8_t)ah_color * 4 + al;
+    ah -= (int8_t)stepshift;
+    uint8_t color = (uint8_t)ah * 4 + al;
     color += (uint8_t)(maxiters * 4 + BASECOLOR);
     return color;
 }
