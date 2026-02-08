@@ -4,8 +4,11 @@
  * Raymarched implicit surface lattice (octahedra, bars, bolts).
  * Original 256-byte intro by Rrrola (Riverwash 2009), decompiled to C.
  *
- * Usage: ./puls_big [width height]
- * Defaults to 320x200 if no arguments given.
+ * Usage: ./puls_big [width height [precision]]
+ *   width height  - window size (default 320x200)
+ *   precision     - raymarching precision 0-8 (default: auto from resolution)
+ *                   0 = original quality, each +1 doubles convergence fineness
+ *                   auto: 0 for <=320, 1 for <=640, 2 for <=1280, etc.
  */
 
 #include <SDL/SDL.h>
@@ -17,8 +20,8 @@
 #define FPS      25
 #define FRAME_MS (1000 / FPS)
 
-#define MAXSTEPSHIFT 6
-#define MAXITERS     26
+#define BASE_MAXSTEPSHIFT 6
+#define BASE_MAXITERS     26
 #define BASECOLOR    (-34)
 #define BLOWUP       86
 
@@ -71,11 +74,23 @@ static void init_palette(SDL_Surface *screen)
     }
 }
 
-static uint8_t intersect(int16_t dir[3], int16_t orig[3], int16_t r_val)
+/*
+ * Binary search ray intersection with configurable precision.
+ *
+ * maxstepshift: convergence depth (original=6, higher=finer surface edges)
+ * maxiters:     iteration budget  (original=26, increase with maxstepshift)
+ *
+ * Increasing both by the same amount D gives D extra levels of binary
+ * subdivision at the surface while keeping the same color/AO range.
+ * int16 direction vectors support up to maxstepshift ~14 before
+ * fine steps degenerate to ±1.
+ */
+static uint8_t intersect(int16_t dir[3], int16_t orig[3], int16_t r_val,
+                          int maxstepshift, int maxiters)
 {
-    int stepshift = MAXSTEPSHIFT;
+    int stepshift = maxstepshift;
     int16_t hit_flag = 0;
-    int8_t  ah = -(int8_t)MAXITERS;
+    int8_t  ah = -(int8_t)maxiters;
     uint8_t al = 0;
 
     for (;;) {
@@ -87,6 +102,10 @@ static uint8_t intersect(int16_t dir[3], int16_t orig[3], int16_t r_val)
 
         al = 0xFF;
 
+        /* Hitlimit: inflated by BLOWUP/stepshift ("ambient occlusion").
+         * The formula naturally extends to larger stepshift values:
+         * at stepshift=14 the hitlimit converges to ~9472, providing
+         * a tighter detection zone for finer convergence. */
         uint16_t cx = ((uint16_t)BLOWUP << 8) | (uint16_t)(uint8_t)stepshift;
         cx >>= stepshift;
         uint16_t hitlimit = ((uint16_t)(((cx >> 8) + 37) & 0xFF) << 8)
@@ -170,7 +189,7 @@ static uint8_t intersect(int16_t dir[3], int16_t orig[3], int16_t r_val)
             if (stepshift > 0) stepshift--;
         }
 
-        if (stepshift >= MAXSTEPSHIFT) break;
+        if (stepshift >= maxstepshift) break;
 
         ah += (int8_t)(hit_flag & 0xFF);
         if (ah == 0) break;
@@ -178,21 +197,49 @@ static uint8_t intersect(int16_t dir[3], int16_t orig[3], int16_t r_val)
 
     ah -= (int8_t)stepshift;
     uint8_t color = (uint8_t)ah * 4 + al;
-    color += (uint8_t)(MAXITERS * 4 + BASECOLOR);
+    color += (uint8_t)(maxiters * 4 + BASECOLOR);
     return color;
 }
 
 int main(int argc, char *argv[])
 {
     int W = 320, H = 200;
+    int precision = -1;  /* -1 = auto */
+
     if (argc >= 3) {
         W = atoi(argv[1]);
         H = atoi(argv[2]);
         if (W <= 0 || H <= 0) {
-            fprintf(stderr, "Usage: %s [width height]\n", argv[0]);
+            fprintf(stderr,
+                "Usage: %s [width height [precision]]\n"
+                "  precision 0-8 (default: auto from resolution)\n", argv[0]);
             return 1;
         }
     }
+    if (argc >= 4) {
+        precision = atoi(argv[3]);
+        if (precision < 0 || precision > 8) {
+            fprintf(stderr, "Precision must be 0-8\n");
+            return 1;
+        }
+    }
+
+    /* Auto-detect precision from resolution */
+    if (precision < 0) {
+        int maxdim = W > H ? W : H;
+        precision = 0;
+        while ((320 << precision) < maxdim && precision < 8)
+            precision++;
+    }
+
+    int maxstepshift = BASE_MAXSTEPSHIFT + precision;
+    int maxiters     = BASE_MAXITERS + precision;
+
+    /* Cap maxstepshift at 14: beyond that, int16 dir>>shift degenerates to ±1 */
+    if (maxstepshift > 14) maxstepshift = 14;
+
+    fprintf(stderr, "puls_big: %dx%d, precision=%d (maxstepshift=%d, maxiters=%d)\n",
+            W, H, precision, maxstepshift, maxiters);
 
     if (SDL_Init(SDL_INIT_VIDEO) < 0) {
         fprintf(stderr, "SDL_Init: %s\n", SDL_GetError());
@@ -281,7 +328,8 @@ int main(int argc, char *argv[])
                 orig[1] = (int16_t)((uint16_t)base + 0xB000u);
                 orig[2] = (int16_t)((uint16_t)base + 0x6000u);
 
-                pixbuf[row * W + col] = intersect(dir, orig, r_val);
+                pixbuf[row * W + col] = intersect(dir, orig, r_val,
+                                                   maxstepshift, maxiters);
             }
         }
 
