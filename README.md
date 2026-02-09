@@ -38,11 +38,12 @@ Scaled versions that accept custom window dimensions:
 
 ### Multi-threaded
 
+- `lattice_parallel [width height]` - Multi-threaded lattice renderer. Set `THREADS` env var for thread count (default 16).
 - `puls_parallel [width height [precision]]` - Multi-threaded puls renderer. Set `THREADS` env var for thread count (default 16).
 
 ## Controls
 
-All `*_big` and `puls_parallel` programs support:
+All `*_big`, `lattice_parallel`, and `puls_parallel` programs support:
 
 | Key | Action |
 |-----|--------|
