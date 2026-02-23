@@ -1,3 +1,8 @@
+
+;  (м) ( ) м ) ( )   256b intro by baze/3SC for Syndeecate 2001   use NASM to
+;  плп лмл ллл ллм   loveC: thanks, Serzh: eat my socks dude ;]   compile the
+;  ( ) ( ) ( ) ( )   e-mail: baze@stonline.sk, web: www.3SC.sk    source code
+
 [org 100h]
 [segment .text]
 
