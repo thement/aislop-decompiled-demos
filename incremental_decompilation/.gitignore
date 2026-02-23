@@ -1,0 +1,11 @@
+# Build outputs
+tube
+tube_rewrite
+tube_sdl
+tube_big
+texgen
+*.com
+
+# Frame captures
+*.bmp
+*.BMP
