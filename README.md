@@ -1,8 +1,8 @@
-# detube0
+# detube
 
-Decompiled DOS demoscene intros ported to C with SDL 1.2.
+LLM-decompiled DOS demoscene intros ported to C with SDL 1.2.
 
-Three effects from the 256-byte intro scene, reverse-engineered from x86 real-mode COM binaries into readable C. Demos decompiled using LLMs.
+Three effects from the 256-byte intro scene, reverse-engineered from x86 real-mode COM binaries into readable C.
 
 ## Effects
 
