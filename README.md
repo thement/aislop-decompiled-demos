@@ -10,6 +10,13 @@ Three effects from the 256-byte intro scene, reverse-engineered from x86 real-mo
 - **lattice** - Raymarched Schwarz P-surface (triply periodic minimal surface) with sphere tracing (original 256-byte intro by baze)
 - **puls** - Raymarched implicit surface lattice with octahedra, bars, and bolts using binary search (original 256-byte intro by Rrrola, Riverwash 2009)
 
+![tube](tube.png)
+
+![lattice](lattice.png)
+
+![puls](puls.png)
+
+
 ## Building
 
 ```
